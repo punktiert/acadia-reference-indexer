@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="wordmark">ACADIA <b>2026</b></span>
+    <span class="tagline">Humanism Recoded — Detroit</span>
+  </div>
+</header>
+<div class="wrap">
+
+  <div class="lede">
+    <div class="eyebrow">// Proceedings reference indexing</div>
+    <h1>Reference Indexer</h1>
+    <p class="sub">Upload your final paper (.docx). We read your references and prepare the
+      CumInCAD index for you to review and confirm — takes a couple of minutes.</p>
+  </div>
+
+  <!-- ================= STAGE A: upload ================= -->
+  <div id="stageA" class="card">
+    <div class="row">
+      <div class="field">
+        <label>Track <span class="hint">(sets your volume &amp; type)</span></label>
+        <select id="track"></select>
+      </div>
+      <div class="field">
+        <label>Paper ID <span class="hint">(your EasyChair submission number)</span></label>
+        <input id="number" type="number" min="1" step="1" placeholder="e.g. 42">
+        <div class="hint" style="margin-top:5px">
+          Find it in EasyChair → <em>My Submissions</em>: the number in the <strong>#</strong> column next to your paper.
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Main contact email</label>
+      <input id="email" type="email" placeholder="you@university.edu">
+    </div>
+
+    <div class="field">
+      <label>Your paper <span class="hint">(Word .docx, formatted with the ACADIA template styles)</span></label>
+      <input id="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+    </div>
+
+    <div class="preview field">
+      Your CumInCAD ID will be <code id="idPreview">—</code> &nbsp;·&nbsp; type <span id="typePreview">—</span>
+      <span class="src" id="srcPreview"></span>
+    </div>
+
+    <div id="bannerA"></div>
+    <div class="toolbar">
+      <button id="uploadBtn">Upload &amp; parse references</button>
+    </div>
+  </div>
+
+  <!-- ================= STAGE B: confirm ================= -->
+  <div id="stageB" class="card" hidden>
+    <div id="banners"></div>
+
+    <div class="field">
+      <label>Paper ID</label>
+      <div class="preview"><code id="idB">—</code> &nbsp;·&nbsp; <span id="typeB"></span></div>
+    </div>
+
+    <div class="field">
+      <label>Title</label>
+      <textarea id="title" rows="2"></textarea>
+    </div>
+
+    <h2>Authors</h2>
+    <p class="hint">Last name = the surname for the index. Fix any split below — middle names
+      belong in “First”.</p>
+    <table id="authorsTable">
+      <thead><tr><th>First</th><th>Last</th><th class="col-rm"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="toolbar"><button class="ghost tiny" id="addAuthor">+ add author</button></div>
+
+    <h2>References</h2>
+    <div class="counts" id="refCounts"></div>
+    <table id="refsTable">
+      <thead><tr><th class="col-rm"></th><th>Authors</th><th class="col-year">Year</th><th>Title</th><th>Source</th><th class="col-rm"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="toolbar"><button class="ghost tiny" id="addRef">+ add reference</button></div>
+
+    <div id="bannerB"></div>
+    <div class="toolbar">
+      <button id="submitBtn">Confirm &amp; submit to index</button>
+      <button class="ghost" id="backBtn">Start over</button>
+    </div>
+  </div>
+
+  <div id="done" hidden></div>
+
+</div>
+<?!= include('JavaScript'); ?>
+</body>
+</html>

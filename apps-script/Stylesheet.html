@@ -1,0 +1,115 @@
+<style>
+  /* ===== ACADIA 2026 — Humanism Recoded visual identity =====
+     pure black/white · oxblood accent (#933231) · Roboto + Roboto Mono · dotted-grid texture */
+  :root {
+    --ink: #0a0a0a; --paper: #ffffff; --accent: #933231; --accent-700: #6f2625;
+    --muted: #707070; --line: #e6e6e6; --line-2: #d6d6d6; --ink-soft: #2a2a2a;
+    --review: #b06a12; --review-bg: #fdf6ec; --review-line: #e0992f;
+    --ok: #0a7d52; --ok-bg: #f0fbf6; --danger: #b3261e; --danger-bg: #fdf1f0;
+    --mono: 'Roboto Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --sans: 'Roboto', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: var(--sans); color: var(--ink); background: var(--paper);
+    margin: 0; line-height: 1.55; font-size: 15px;
+  }
+
+  /* ---- brand top bar (echoes the conference hero) ---- */
+  .topbar {
+    background: var(--ink);
+    background-image: radial-gradient(rgba(255,255,255,.18) 1px, transparent 1.5px);
+    background-size: 15px 15px;
+    border-bottom: 3px solid var(--accent);
+    color: #fff;
+  }
+  .topbar-inner {
+    max-width: 1060px; margin: 0 auto; padding: 14px 22px;
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  }
+  .wordmark { font-family: var(--mono); font-weight: 700; font-size: 17px; letter-spacing: .14em; }
+  .wordmark b { color: var(--accent); font-weight: 700; }
+  .tagline { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+
+  /* ---- layout ---- */
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 30px 22px 90px; }
+  .lede { margin: 6px 0 26px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  h1 { font-family: var(--mono); font-size: 30px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 8px; line-height: 1.08; }
+  .sub { color: var(--muted); margin: 0; max-width: 64ch; }
+  h2 {
+    font-family: var(--mono); font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .12em; margin: 30px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--ink);
+  }
+  h2::before { content: "▍ "; color: var(--accent); }
+
+  /* ---- cards ---- */
+  .card { border: 1px solid var(--line-2); border-top: 3px solid var(--ink); border-radius: 3px; padding: 22px; margin-bottom: 18px; background: #fff; }
+
+  /* ---- form controls ---- */
+  label { display: block; font-family: var(--mono); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 6px; color: var(--ink); }
+  label .hint, .hint { font-family: var(--sans); text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; font-size: 12px; }
+  .hint em { font-style: normal; font-family: var(--mono); color: var(--ink-soft); }
+  input, select, textarea {
+    width: 100%; padding: 10px 11px; border: 1px solid var(--line-2); border-radius: 2px;
+    font-family: var(--sans); font-size: 14px; color: var(--ink); background: #fff;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(147,50,49,.20); }
+  textarea { resize: vertical; min-height: 40px; line-height: 1.45; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { margin-bottom: 16px; }
+
+  /* ---- ID / SOURCE preview ---- */
+  .preview { border: 1px dashed var(--line-2); border-left: 3px solid var(--accent); border-radius: 2px; padding: 11px 13px; font-size: 13px; background: #fafafa; }
+  .preview code { font-family: var(--mono); font-size: 14px; color: var(--accent); font-weight: 700; letter-spacing: .02em; }
+  .preview .src { color: var(--muted); display: block; margin-top: 6px; word-break: break-word; font-size: 12px; }
+
+  /* ---- buttons ---- */
+  button {
+    font-family: var(--mono); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; padding: 11px 20px; border-radius: 2px; cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  button:hover { background: var(--accent-700); border-color: var(--accent-700); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: #fff; color: var(--ink); border-color: var(--ink); }
+  button.ghost:hover { background: var(--ink); color: #fff; }
+  button.tiny { padding: 5px 11px; font-size: 11px; letter-spacing: .05em; }
+  button.danger { border-color: var(--line-2); background: #fff; color: var(--danger); }
+  button.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+  /* ---- tables ---- */
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th { text-align: left; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 7px 8px; border-bottom: 2px solid var(--ink); font-weight: 500; }
+  td { padding: 6px 7px; vertical-align: top; border-bottom: 1px solid var(--line); }
+  td.num { font-family: var(--mono); color: var(--muted); font-size: 12px; padding-top: 13px; width: 28px; }
+  .col-year input { font-family: var(--mono); }
+  tr.review td { background: var(--review-bg); }
+  tr.review td.num { border-left: 3px solid var(--review-line); color: var(--review); }
+  .flagtip { color: var(--review); font-size: 11px; margin-top: 4px; font-family: var(--mono); letter-spacing: .02em; }
+  /* resolved (edited or confirmed) flagged rows */
+  tr.resolved td { background: var(--ok-bg); }
+  tr.resolved td.num { border-left: 3px solid var(--ok); color: var(--ok); }
+  tr.resolved .flagtip, tr.resolved .confirmline { color: var(--ok); }
+  .confirmline { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--review); letter-spacing: .02em; cursor: pointer; }
+  .confirmline input { width: auto; margin: 0; accent-color: var(--accent); }
+  .confirmline.done { color: var(--ok); }
+  /* empty-field block on submit */
+  input.empty, textarea.empty { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(179,38,30,.14); }
+
+  /* ---- banners ---- */
+  .banner { padding: 11px 14px; border-radius: 2px; font-size: 13px; margin-bottom: 12px; border: 1px solid; }
+  .banner.warn { background: var(--review-bg); color: var(--review); border-color: var(--review-line); }
+  .banner.err { background: var(--danger-bg); color: var(--danger); border-color: #e6b3ae; }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); border-color: #a6e9c5; }
+
+  .counts { color: var(--muted); font-size: 12px; margin: 8px 2px; font-family: var(--mono); letter-spacing: .03em; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 7px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  [hidden] { display: none !important; }
+  .col-year { width: 88px; } .col-rm { width: 36px; }
+  ::selection { background: var(--accent); color: #fff; }
+  @media (max-width: 720px) { .row { grid-template-columns: 1fr; } h1 { font-size: 24px; } .wrap { padding-top: 20px; } }
+</style>

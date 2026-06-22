@@ -1,0 +1,359 @@
+<script>
+(function () {
+  'use strict';
+
+  var cfg = null;     // from getConfigForClient
+  var draft = null;   // from processUpload
+  var titleNeedsConfirm = false, titleConfirm = null, titleOrig = '';
+
+  var FLAG_TEXT = {
+    verify_year: 'check year', year_not_found: 'no year found', verify_segmentation: 'check author/title split',
+    authors_empty: 'no authors found', title_missing: 'no title found', source_empty: 'no source found',
+    title_unquoted_guess: 'title was guessed', verify_author_has_url: 'URL in authors?',
+    verify_long_span: 'unusually long', verify_title_quotes: 'check quotes', year_nonstandard: 'unusual year',
+    single_token_name: 'one-word name', verify_name_particle: 'check name particle', verify_name_suffix: 'check suffix'
+  };
+
+  // ---- tiny DOM helpers ----
+  function $(id) { return document.getElementById(id); }
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'class') n.className = attrs[k];
+      else if (k === 'text') n.textContent = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { n.appendChild(c); });
+    return n;
+  }
+  function banner(host, kind, msg) {
+    $(host).appendChild(el('div', { class: 'banner ' + kind, text: msg }));
+  }
+
+  // ---- server bridge (real Apps Script, or a mock for the preview/demo) ----
+  function serverCall(fn, arg, onOk, onErr) {
+    if (window.google && google.script && google.script.run) {        // deployed Apps Script
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(function (e) {
+        onErr(e && e.message ? e.message : String(e));
+      })[fn](arg);
+      return;
+    }
+    // Local real backend (python) if one is serving /api; otherwise the static mock (demo.html).
+    fetch('/api/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(arg || {}) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { onOk(d); })
+      .catch(function () { setTimeout(function () { onOk(MOCK[fn](arg)); }, 200); }); // demo fallback
+  }
+
+  var MOCK = {
+    getConfigForClient: function () {
+      return {
+        volumes: {
+          '1': { type: 'project', sourcePreview: 'ACADIA 2026: Humanism Recoded [Project Catalog …]' },
+          '2': { type: 'paper', sourcePreview: 'ACADIA 2026: Humanism Recoded [Proceedings of the 46th Annual Conference …]' }
+        }, types: ['paper', 'project'], idPrefix: 'acadia26', idPad: 2, maxAuthors: 8
+      };
+    },
+    processUpload: function (p) {
+      return {
+        ok: true,
+        meta: { id: 'acadia26_v' + p.meta.vol + '_' + ('0' + p.meta.number).slice(-2), vol: p.meta.vol,
+                number: String(p.meta.number), type: 'paper', email: p.meta.email, source: 'ACADIA 2026: …' },
+        title: 'A Demonstration Paper on Computational Design',
+        keywords: 'demo, parsing', authorOverflow: 0,
+        authors: [{ first: 'Jane Q.', last: 'Smith', flags: [] }, { first: 'John', last: 'Doe', flags: [] }],
+        references: [
+          { authors: 'Fox, Michael and Miles Kemp', year: '2009', title: 'Interactive Architecture', source: 'New York: Princeton Architectural Press.', flags: ['title_unquoted_guess'], review: false },
+          { authors: 'Brooks, Rodney A.', year: '1990', title: 'Elephants Don’t Play Chess', source: 'Robotics and Autonomous Systems 6 (1): 3–15.', flags: [], review: false },
+          { authors: 'Google', year: '2025', title: 'Gemini 1.5 Pro in Google Docs', source: '2025. Accessed June 15, 2025.', flags: ['verify_year'], review: true }
+        ],
+        diagnostics: { styledRefCount: 3, usedFallback: false, titleFound: true, authorFound: true }
+      };
+    },
+    commitSubmission: function (r) {
+      return { ok: true, paperId: r.meta.id, titleRowsWritten: 1, refRowsWritten: (r.references || []).length };
+    }
+  };
+
+  // ---- Stage A ----
+  function pad(n) {
+    var s = String(parseInt(n, 10) || '');
+    while (s && cfg && s.length < cfg.idPad) s = '0' + s;
+    return s;
+  }
+  function updatePreview() {
+    if (!cfg) return;
+    var vol = $('track').value, num = $('number').value;
+    var v = cfg.volumes[vol] || {};
+    $('idPreview').textContent = num ? (cfg.idPrefix + '_v' + vol + '_' + pad(num)) : '—';
+    $('typePreview').textContent = v.type || '—';
+    $('srcPreview').textContent = v.sourcePreview ? ('SOURCE: ' + v.sourcePreview) : '';
+  }
+
+  function initStageA() {
+    var sel = $('track');
+    Object.keys(cfg.volumes).forEach(function (vol) {
+      var v = cfg.volumes[vol];
+      var label = v.type.charAt(0).toUpperCase() + v.type.slice(1) + ' — vol ' + vol;
+      sel.appendChild(el('option', { value: vol, text: label }));
+    });
+    sel.value = '2'; // default: paper
+    sel.addEventListener('change', updatePreview);
+    $('number').addEventListener('input', updatePreview);
+    $('uploadBtn').addEventListener('click', doUpload);
+    updatePreview();
+  }
+
+  function doUpload() {
+    $('bannerA').innerHTML = '';
+    var file = $('file').files[0];
+    var email = $('email').value.trim();
+    var num = $('number').value;
+    if (!num) return banner('bannerA', 'err', 'Please enter your paper number.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return banner('bannerA', 'err', 'Please enter a valid contact email.');
+    if (!file) return banner('bannerA', 'err', 'Please choose your .docx file.');
+    if (!/\.docx$/i.test(file.name)) return banner('bannerA', 'err', 'Please upload a Word .docx file (not PDF).');
+
+    var btn = $('uploadBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Reading your paper…';
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      var res = reader.result;
+      var base64 = res.substring(res.indexOf(',') + 1);
+      serverCall('processUpload', {
+        base64: base64, filename: file.name,
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        meta: { vol: $('track').value, number: num, email: email }
+      }, function (data) {
+        btn.disabled = false; btn.textContent = 'Upload & parse references';
+        if (!data || !data.ok) return banner('bannerA', 'err', (data && data.error) || 'Upload failed.');
+        draft = data; renderStageB(data);
+      }, function (msg) {
+        btn.disabled = false; btn.textContent = 'Upload & parse references';
+        banner('bannerA', 'err', 'Upload failed: ' + msg);
+      });
+    };
+    reader.onerror = function () {
+      btn.disabled = false; btn.textContent = 'Upload & parse references';
+      banner('bannerA', 'err', 'Could not read the file.');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ---- Stage B ----
+  function renderStageB(data) {
+    $('banners').innerHTML = '';
+    $('bannerB').innerHTML = '';
+    var d = data.diagnostics || {};
+    if (d.usedFallback || d.styledRefCount === 0) {
+      banner('banners', 'warn', 'We could not find references in the ACADIA-Reference style, so we detected them automatically — please check the list carefully.');
+    }
+    if (d.titleFallback) banner('banners', 'warn', 'We detected your title automatically (the ACADIA-Title style wasn’t applied) — please verify it.');
+    else if (!d.titleFound) banner('banners', 'warn', 'We could not detect your title — please enter it below.');
+    if (!d.authorFound) banner('banners', 'warn', 'We could not detect author names in the document — please add them below.');
+    if (data.authorOverflow > 0) banner('banners', 'warn', 'More than ' + cfg.maxAuthors + ' authors were detected; only the first ' + cfg.maxAuthors + ' are kept (CumInCAD limit).');
+
+    $('idB').textContent = data.meta.id;
+    $('typeB').textContent = 'type: ' + data.meta.type;
+    $('title').value = data.title || '';
+    titleNeedsConfirm = !!d.titleFallback;
+    setupTitleConfirm(data.title || '');
+
+    var atb = $('authorsTable').getElementsByTagName('tbody')[0];
+    atb.innerHTML = '';
+    var authors = (data.authors && data.authors.length) ? data.authors : [{ first: '', last: '' }];
+    authors.forEach(function (a) { atb.appendChild(authorRow(a)); });
+
+    var rtb = $('refsTable').getElementsByTagName('tbody')[0];
+    rtb.innerHTML = '';
+    (data.references || []).forEach(function (r) { rtb.appendChild(refRow(r)); });
+    renumber();
+    updateCounts();
+
+    $('stageA').hidden = true;
+    $('stageB').hidden = false;
+    $('addAuthor').onclick = function () { atb.appendChild(authorRow({ first: '', last: '' })); };
+    $('addRef').onclick = function () { rtb.appendChild(refRow({ authors: '', year: '', title: '', source: '', review: false })); renumber(); updateCounts(); };
+    $('submitBtn').onclick = doSubmit;
+    $('backBtn').onclick = function () { location.reload(); };
+    window.scrollTo(0, 0);
+  }
+
+  function inputCell(value, cls, multiline) {
+    var node = multiline ? el('textarea', { rows: '2' }) : el('input', { type: 'text' });
+    node.value = value || '';
+    if (cls) node.className = cls;
+    return el('td', null, [node]);
+  }
+  function removeCell(onClick) {
+    var b = el('button', { class: 'danger tiny', title: 'remove', text: '×' });
+    b.addEventListener('click', onClick);
+    return el('td', { class: 'col-rm' }, [b]);
+  }
+
+  function authorRow(a) {
+    var tr = el('tr');
+    tr.appendChild(inputCell(a.first, null, false));
+    tr.appendChild(inputCell(a.last, null, false));
+    tr.appendChild(removeCell(function () { tr.parentNode.removeChild(tr); }));
+    if (a.flags && a.flags.length) tr.className = 'review';
+    return tr;
+  }
+
+  function refRow(r) {
+    var tr = el('tr');
+    tr._flagged = !!(r.flags && r.flags.length);   // ANY flag (incl. "title was guessed") needs edit-or-confirm
+    tr.appendChild(el('td', { class: 'num' }));                       // # (filled by renumber)
+    var authorsTd = inputCell(r.authors, null, true);
+    if (r.flags && r.flags.length) {
+      var tips = r.flags.map(function (f) { return FLAG_TEXT[f] || f; }).join(' · ');
+      authorsTd.appendChild(el('div', { class: 'flagtip', text: '⚠ ' + tips }));
+    }
+    if (tr._flagged) {
+      var line = el('label', { class: 'confirmline' });
+      var cb = el('input', { type: 'checkbox' });
+      cb.addEventListener('change', function () { refreshRow(tr); });
+      line.appendChild(cb);
+      line.appendChild(el('span', { text: 'edit a field, or tick to confirm it’s correct' }));
+      tr._confirm = cb;
+      authorsTd.appendChild(line);
+    }
+    tr.appendChild(authorsTd);
+    tr.appendChild(inputCell(r.year, 'col-year', false));
+    tr.appendChild(inputCell(r.title, null, true));
+    tr.appendChild(inputCell(r.source, null, true));
+    tr.appendChild(removeCell(function () { tr.parentNode.removeChild(tr); renumber(); updateCounts(); }));
+
+    // the four editable fields, for empty-checks and edit detection
+    tr._fields = [tr.cells[1].querySelector('textarea'), tr.cells[2].querySelector('input'),
+                  tr.cells[3].querySelector('textarea'), tr.cells[4].querySelector('textarea')];
+    tr._fields.forEach(function (inp) {
+      inp._orig = inp.value;
+      inp.addEventListener('input', function () { inp.classList.remove('empty'); refreshRow(tr); });
+    });
+    refreshRow(tr);
+    return tr;
+  }
+
+  function renumber() {
+    var rows = $('refsTable').getElementsByTagName('tbody')[0].rows;
+    for (var i = 0; i < rows.length; i++) rows[i].cells[0].textContent = (i + 1);
+  }
+  function updateCounts() {
+    var rows = $('refsTable').getElementsByTagName('tbody')[0].rows;
+    var pending = 0;
+    for (var i = 0; i < rows.length; i++) if (rows[i]._flagged && !rowResolved(rows[i])) pending++;
+    $('refCounts').textContent = rows.length + ' reference' + (rows.length === 1 ? '' : 's') +
+      (pending ? ' · ' + pending + ' still need a check (edit or tick)' : (rows.length ? ' · all reviewed' : ''));
+  }
+
+  // ---- "edit or confirm" resolution for flagged rows / the auto-detected title ----
+  function rowEdited(tr) { return (tr._fields || []).some(function (i) { return i.value !== i._orig; }); }
+  function rowResolved(tr) {
+    if (!tr._flagged) return true;
+    return (tr._confirm && tr._confirm.checked) || rowEdited(tr);
+  }
+  function refreshRow(tr) {
+    if (!tr._flagged) return;
+    var ok = rowResolved(tr);
+    tr.classList.toggle('review', !ok);
+    tr.classList.toggle('resolved', ok);
+    updateCounts();
+  }
+  function setupTitleConfirm(orig) {
+    titleOrig = orig;
+    var old = document.getElementById('titleConfirmWrap'); if (old) old.remove();
+    var t = $('title'); t.classList.remove('empty');
+    if (!titleNeedsConfirm) { titleConfirm = null; return; }
+    var wrap = el('label', { class: 'confirmline', id: 'titleConfirmWrap' });
+    titleConfirm = el('input', { type: 'checkbox' });
+    wrap.appendChild(titleConfirm);
+    wrap.appendChild(el('span', { text: 'auto-detected — edit it, or tick to confirm it’s right' }));
+    t.parentNode.appendChild(wrap);
+    titleConfirm.addEventListener('change', function () { wrap.classList.toggle('done', titleResolved()); });
+    t.addEventListener('input', function () { t.classList.remove('empty'); wrap.classList.toggle('done', titleResolved()); });
+  }
+  function titleResolved() {
+    if (!titleNeedsConfirm) return true;
+    return (titleConfirm && titleConfirm.checked) || ($('title').value !== titleOrig);
+  }
+
+  function doSubmit() {
+    $('bannerB').innerHTML = '';
+    document.querySelectorAll('.empty').forEach(function (e) { e.classList.remove('empty'); });
+
+    // ---- title: non-empty + (if auto-detected) edited or confirmed ----
+    var titleVal = $('title').value.trim();
+    if (!titleVal) { $('title').classList.add('empty'); return banner('bannerB', 'err', 'Please enter a title.'); }
+    if (!titleResolved()) return banner('bannerB', 'err', 'Please review the auto-detected title — edit it, or tick the confirm box.');
+
+    // ---- authors: each present row needs first AND last ----
+    var authors = [], authorIncomplete = 0;
+    var arows = $('authorsTable').getElementsByTagName('tbody')[0].rows;
+    for (var i = 0; i < arows.length; i++) {
+      var fi = arows[i].cells[0].firstChild, li = arows[i].cells[1].firstChild;
+      var f = fi.value.trim(), l = li.value.trim();
+      if (!f && !l) continue;                                  // empty row → ignore
+      if (!f) fi.classList.add('empty');
+      if (!l) li.classList.add('empty');
+      if (!f || !l) authorIncomplete++;
+      authors.push({ first: f, last: l });
+    }
+    if (!authors.length) return banner('bannerB', 'err', 'Please enter at least one author (first and last name).');
+    if (authorIncomplete) return banner('bannerB', 'err', 'Each author needs both a first and last name (highlighted).');
+
+    // ---- references: no empty fields + every flagged row resolved ----
+    var rrows = $('refsTable').getElementsByTagName('tbody')[0].rows;
+    var emptyN = 0, pendingN = 0, firstBad = null, refs = [];
+    for (var j = 0; j < rrows.length; j++) {
+      var tr = rrows[j];
+      var vals = tr._fields.map(function (inp) { return inp.value.trim(); });
+      var filled = vals.filter(function (v) { return v; }).length;
+      if (filled === 0) continue;                              // blank row → ignore
+      if (filled < 4) {
+        tr._fields.forEach(function (inp) { if (!inp.value.trim()) inp.classList.add('empty'); });
+        emptyN++; firstBad = firstBad || tr;
+      }
+      if (tr._flagged && !rowResolved(tr)) { pendingN++; firstBad = firstBad || tr; }
+      refs.push({ authors: vals[0], year: vals[1], title: vals[2], source: vals[3] });
+    }
+    if (!refs.length) return banner('bannerB', 'err', 'Please add at least one reference.');
+    if (emptyN || pendingN) {
+      var parts = [];
+      if (emptyN) parts.push(emptyN + ' reference' + (emptyN > 1 ? 's have' : ' has') + ' an empty field');
+      if (pendingN) parts.push(pendingN + ' flagged reference' + (pendingN > 1 ? 's' : '') + ' still need a check');
+      banner('bannerB', 'err', 'Can’t submit yet — ' + parts.join('; ') + '. Fill every column and resolve the highlighted rows.');
+      if (firstBad) firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+
+    var reviewed = { meta: draft.meta, title: titleVal, authors: authors, references: refs };
+    var btn = $('submitBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Submitting…';
+    serverCall('commitSubmission', reviewed, function (res) {
+      btn.disabled = false; btn.textContent = 'Confirm & submit to index';
+      if (!res || !res.ok) {
+        if (res && res.error === 'duplicate_id') return banner('bannerB', 'err', 'This paper ID is already indexed. Contact the editors if you need to update it.');
+        return banner('bannerB', 'err', (res && res.error) || 'Submission failed.');
+      }
+      $('stageB').hidden = true;
+      var done = $('done'); done.hidden = false;
+      done.appendChild(el('div', { class: 'banner ok',
+        text: 'Saved — ' + res.paperId + ': 1 paper row and ' + res.refRowsWritten + ' reference rows added to the index. Thank you!' }));
+    }, function (msg) {
+      btn.disabled = false; btn.textContent = 'Confirm & submit to index';
+      banner('bannerB', 'err', 'Submission failed: ' + msg);
+    });
+  }
+
+  // ---- boot ----
+  serverCall('getConfigForClient', null, function (c) {
+    cfg = c; initStageA();
+  }, function (msg) {
+    banner('bannerA', 'err', 'Could not load configuration: ' + msg);
+  });
+})();
+</script>

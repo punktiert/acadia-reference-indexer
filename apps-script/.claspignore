@@ -1,0 +1,7 @@
+# Files clasp should NOT push to the Apps Script project (clasp pushes the modular sources).
+README.md
+build.py
+demo.html
+dist/**
+**/*.docx
+.playwright-mcp/**

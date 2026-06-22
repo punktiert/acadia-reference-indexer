@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local runtime data from prototype/local_server.py (never commit author data)
+prototype/uploads/
+prototype/output/
+prototype/_test/
+
+# Real conference/author material — keep out of the repo (privacy + copyright)
+*.docx
+*.pdf
+*.xlsx
+*.xlsm
+*.csv
+
+# Tooling / OS
+.playwright-mcp/
+.clasp.json
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
