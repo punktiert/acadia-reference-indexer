@@ -3,6 +3,8 @@
 
 // ---------- Config.gs ----------
 
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * Config.gs — defaults + live config read from the in-sheet "Settings" tab.
  *
@@ -105,6 +107,8 @@ function typeForVolume(cfg, vol) {
 
 // ---------- Setup.gs ----------
 
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * Setup.gs — the editor-facing, no-code setup. Adds an "ACADIA Indexer" menu to the Sheet.
  *
@@ -241,6 +245,8 @@ function ensureHelpTab_(ss) {
 
 // ---------- Docx.gs ----------
 
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * Docx.gs — extract title / authors / keywords / references from a .docx by paragraph style.
  *
@@ -407,6 +413,8 @@ function extractDocx(docxBlob) {
 
 // ---------- RefParser.gs ----------
 
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * RefParser.gs — split one Chicago reference string into {authors, year, title, source}.
  *
@@ -634,6 +642,8 @@ function parseReference(raw) {
 
 // ---------- NameSplit.gs ----------
 
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * NameSplit.gs — split the ACADIA-Author block (display order, e.g. "Jane Q. Smith, John
  * Doe") into [{first, last, flags}] pairs for the AUTHOR n FIRST/LAST columns.
@@ -697,6 +707,8 @@ function splitAuthorBlock(text) {
 
 // ---------- SheetIO.gs ----------
 
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * SheetIO.gs — persistence. Saves the uploaded .docx to Drive and writes submission rows to
  * the two master tabs in the exact CumInCAD column order, under a script lock, with
@@ -829,6 +841,8 @@ function writeSubmission_(reviewed) {
 
 // ---------- Code.gs ----------
 
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * Code.gs — web-app entry point + client-callable endpoints.
  *

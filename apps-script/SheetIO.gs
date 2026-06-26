@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * SheetIO.gs — persistence. Saves the uploaded .docx to Drive and writes submission rows to
  * the two master tabs in the exact CumInCAD column order, under a script lock, with

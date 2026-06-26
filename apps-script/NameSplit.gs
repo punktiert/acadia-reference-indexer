@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * NameSplit.gs — split the ACADIA-Author block (display order, e.g. "Jane Q. Smith, John
  * Doe") into [{first, last, flags}] pairs for the AUTHOR n FIRST/LAST columns.

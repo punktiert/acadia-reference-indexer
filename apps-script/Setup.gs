@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * Setup.gs — the editor-facing, no-code setup. Adds an "ACADIA Indexer" menu to the Sheet.
  *

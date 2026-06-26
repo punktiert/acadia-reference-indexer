@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Daniel Koehler / ACADIA
 /**
  * Docx.gs — extract title / authors / keywords / references from a .docx by paragraph style.
  *

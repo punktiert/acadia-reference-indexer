@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Daniel Koehler / ACADIA
 """
 Local REAL backend for the indexer UI — runs the actual extractor + parser on uploads.
 
