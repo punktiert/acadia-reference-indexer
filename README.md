@@ -136,4 +136,13 @@ Apps Script app and the Python prototype share the same parser logic (kept in lo
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Copyright © 2026 Daniel Koehler / ACADIA.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+**GNU Affero General Public License (AGPL) version 3** as published by the Free Software
+Foundation — see [LICENSE](LICENSE). It is distributed in the hope that it will be useful, but
+**without any warranty**.
+
+Share-alike with attribution: if you modify and share it — including running a **modified
+version as a hosted/network service** — you must make your source available under the same
+AGPL-3.0 terms and keep the credit to the original author(s).
