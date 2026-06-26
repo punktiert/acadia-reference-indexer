@@ -85,9 +85,9 @@ function buildRefRows_(id, references) {
 
 /** Save the uploaded docx into the configured Drive folder, named by paper ID. Replaces any
  *  prior upload for the same ID. Returns the Drive file id. */
-function saveDocx_(blob, id, originalName) {
+function savePaperFile_(blob, id, originalName) {
   var folder = getOrCreateUploadsFolder_();
-  var clean = String(originalName || 'paper.docx').replace(/[\\\/:*?"<>|]+/g, '_');
+  var clean = String(originalName || 'paper').replace(/[\\\/:*?"<>|]+/g, '_');
   var name = id + '__' + clean;
   var existing = folder.getFilesByName(name);
   while (existing.hasNext()) existing.next().setTrashed(true);

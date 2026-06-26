@@ -55,15 +55,25 @@ def api_process_upload(payload):
         return {"ok": False, "error": "No file received."}
 
     pid = build_id(vol, meta["number"])
-    data = base64.b64decode(payload["base64"])
-    saved = os.path.join(UPLOADS, pid + "__" + os.path.basename(str(payload.get("filename", "paper.docx"))))
+    saved = os.path.join(UPLOADS, pid + "__" + os.path.basename(str(payload.get("filename", "paper"))))
     with open(saved, "wb") as f:
-        f.write(data)
+        f.write(base64.b64decode(payload["base64"]))
 
-    ex = extract_docx(saved)
-    all_authors = split_author_block(ex["author_block"])
+    pre = payload.get("preExtracted")
+    if pre:                                  # PDF: the browser already extracted it (pdf.js)
+        title, author_block = pre.get("title", ""), pre.get("authorBlock", "")
+        raw_refs, keywords = pre.get("rawRefs", []), pre.get("keywords", "")
+        diagnostics = pre.get("diagnostics", {"source": "pdf"})
+    else:                                    # .docx: extract here
+        ex = extract_docx(saved)
+        title, author_block, raw_refs, keywords = ex["title"], ex["author_block"], ex["raw_refs"], ex["keywords"]
+        diagnostics = {"source": "docx", "styledRefCount": ex["style_counts"].get("ACADIA-Reference", 0),
+                       "usedFallback": ex["used_fallback"], "titleFound": bool(ex["title"]),
+                       "titleFallback": ex.get("title_fallback", False), "authorFound": bool(ex["author_block"])}
+
+    all_authors = split_author_block(author_block)
     refs = []
-    for raw in ex["raw_refs"]:
+    for raw in raw_refs:
         p = parse_reference(raw)
         p["review"] = needs_review(p["flags"])
         refs.append(p)
@@ -72,12 +82,9 @@ def api_process_upload(payload):
         "meta": {"id": pid, "vol": vol, "number": str(meta["number"]),
                  "type": meta.get("type") or VOLUMES[vol]["type"],
                  "email": str(meta.get("email", "")).strip(), "source": VOLUMES[vol]["sourceBase"]},
-        "title": ex["title"], "keywords": ex["keywords"],
+        "title": title, "keywords": keywords,
         "authors": all_authors[:MAX_AUTHORS], "authorOverflow": max(0, len(all_authors) - MAX_AUTHORS),
-        "references": refs,
-        "diagnostics": {"styledRefCount": ex["style_counts"].get("ACADIA-Reference", 0),
-                        "usedFallback": ex["used_fallback"], "titleFound": bool(ex["title"]),
-                        "titleFallback": ex.get("title_fallback", False), "authorFound": bool(ex["author_block"])},
+        "references": refs, "diagnostics": diagnostics,
     }
 
 

@@ -6,6 +6,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>window.pdfjsLib && (pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');</script>
   <?!= include('Stylesheet'); ?>
 </head>
 <body>
@@ -46,8 +48,9 @@
     </div>
 
     <div class="field">
-      <label>Your paper <span class="hint">(Word .docx, formatted with the ACADIA template styles)</span></label>
-      <input id="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+      <label>Your paper <span class="hint">(Word <strong>.docx</strong> recommended — most accurate; <strong>.pdf</strong> also accepted)</span></label>
+      <input id="file" type="file" accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf">
+      <div class="hint" style="margin-top:5px">A .docx formatted with the ACADIA template styles gives the cleanest result. A PDF works too, but references are extracted approximately — you'll review them on the next screen.</div>
     </div>
 
     <div class="preview field">

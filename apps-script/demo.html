@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>window.pdfjsLib && (pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');</script>
   <style>
   /* ===== ACADIA 2026 — Humanism Recoded visual identity =====
      pure black/white · oxblood accent (#933231) · Roboto + Roboto Mono · dotted-grid texture */
@@ -162,8 +164,9 @@
     </div>
 
     <div class="field">
-      <label>Your paper <span class="hint">(Word .docx, formatted with the ACADIA template styles)</span></label>
-      <input id="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+      <label>Your paper <span class="hint">(Word <strong>.docx</strong> recommended — most accurate; <strong>.pdf</strong> also accepted)</span></label>
+      <input id="file" type="file" accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf">
+      <div class="hint" style="margin-top:5px">A .docx formatted with the ACADIA template styles gives the cleanest result. A PDF works too, but references are extracted approximately — you'll review them on the next screen.</div>
     </div>
 
     <div class="preview field">
@@ -296,6 +299,166 @@
     }
   };
 
+  // ============================================================================
+  // PDF extraction (client-side, via pdf.js) — ported from prototype/dryrun_pdf.py.
+  // Produces {title, authorBlock, rawRefs} from the laid-out PDF; the SERVER then runs the
+  // same parseReference()/splitAuthorBlock() it uses for .docx. Less reliable than .docx
+  // (multi-column layout) — the review/gating step is the safety net.
+  // ============================================================================
+  var PDF_JUNK = /(computing for resil|^acadia\b|acadia team will fill|^\d{1,3}$|^topic\b|et al\.\s*\|)/i;
+  var PDF_HEADING = /^(references|bibliography|works cited)\b/i;
+  var PDF_BIO = /\b(is a|is an|is currently|is the head|holds a|received (his|her)|researches and teaches|is a university professor|earned (his|her))\b/i;
+  var PDF_ENDS = /\.[”’"’�­]?\s*$/;
+  var PDF_AUTHOR_START = /^(?:[A-Z][A-Za-z'’.\-]+,|[A-Z][A-Za-z&'’\-]+\.|[A-Z][A-Za-z'’\-]+ et al\.)/;
+  var PDF_BOILER = /(leave this|do not delete|topic\s*\(acadia|acadia team will fill|computing for resil|^abstract\b|^keywords\b|^references\b)/i;
+
+  function lineText(ln) {
+    var t = '';
+    for (var i = 0; i < ln.length; i++) {
+      if (i > 0 && (ln[i].x0 - ln[i - 1].x1) > 1) t += ' ';
+      t += ln[i].str;
+    }
+    return t.replace(/\s+/g, ' ').trim();
+  }
+  function centralCut(items, x0, x1, W) {
+    var width = x1 - x0;
+    var sub = items.filter(function (w) { return w.x0 >= x0 - 1 && w.x1 <= x1 + 1; });
+    if (width < 170 || sub.length < 12) return null;
+    var BINS = 160, bw = width / BINS, cover = [];
+    for (var b = 0; b < BINS; b++) cover[b] = 0;
+    sub.forEach(function (w) {
+      var lo = Math.max(0, Math.floor((w.x0 - x0) / bw)), hi = Math.min(BINS - 1, Math.floor((w.x1 - x0) / bw));
+      for (var k = lo; k <= hi; k++) cover[k]++;
+    });
+    var maxc = Math.max.apply(null, cover) || 1, thr = 0.04 * maxc;
+    var loB = Math.floor(0.30 * BINS), hiB = Math.floor(0.70 * BINS);
+    var bestLen = 0, bestMid = null, k = loB;
+    while (k < hiB) {
+      if (cover[k] <= thr) { var j = k; while (j < hiB && cover[j] <= thr) j++; if (j - k > bestLen) { bestLen = j - k; bestMid = (k + j) / 2; } k = j; }
+      else k++;
+    }
+    var minBins = Math.max(2, Math.floor((0.008 * W) / bw));
+    return (bestMid !== null && bestLen >= minBins) ? (x0 + bestMid * bw) : null;
+  }
+  function columnCuts(items, W) {
+    if (items.length < 20) return [];
+    var cuts = [];
+    (function rec(x0, x1, depth) {
+      if (depth > 1) return;
+      var c = centralCut(items, x0, x1, W);
+      if (c === null) return;
+      rec(x0, c, depth + 1); cuts.push(c); rec(c, x1, depth + 1);
+    })(0, W, 0);
+    return cuts.sort(function (a, b) { return a - b; });
+  }
+  function colOf(x, cuts) { for (var i = 0; i < cuts.length; i++) if (x < cuts[i]) return i; return cuts.length; }
+  function pageLines(items, W) {
+    var cuts = columnCuts(items, W), out = [];
+    for (var ci = 0; ci <= cuts.length; ci++) {
+      var cw = items.filter(function (w) { return colOf(w.x0, cuts) === ci; });
+      cw.sort(function (a, b) { return (Math.round(a.y / 3) - Math.round(b.y / 3)) || (a.x0 - b.x0); });
+      var cur = [], cy = null, lines = [];
+      cw.forEach(function (w) {
+        if (cy === null || Math.abs(w.y - cy) <= 3) { cur.push(w); if (cy === null) cy = w.y; }
+        else { lines.push(cur); cur = [w]; cy = w.y; }
+      });
+      if (cur.length) lines.push(cur);
+      lines.forEach(function (ln) { ln.sort(function (a, b) { return a.x0 - b.x0; }); out.push(lineText(ln)); });
+    }
+    return out;
+  }
+  function itemsToLines(items) {
+    var byY = {};
+    items.forEach(function (w) { var key = Math.round(w.y / 3); (byY[key] = byY[key] || []).push(w); });
+    return Object.keys(byY).map(function (key) {
+      var ln = byY[key].sort(function (a, b) { return a.x0 - b.x0; });
+      return { y: ln[0].y, size: Math.max.apply(null, ln.map(function (w) { return w.size; })), text: lineText(ln) };
+    }).sort(function (a, b) { return a.y - b.y; });
+  }
+  function extractTitleAuthors(pageItems) {
+    var best = null;
+    for (var pi = 0; pi < Math.min(2, pageItems.length); pi++) {
+      itemsToLines(pageItems[pi]).forEach(function (L) {
+        if (L.y > 360 || L.text.length < 6 || PDF_BOILER.test(L.text)) return;
+        if (best === null || L.size > best.size + 0.5) best = { size: L.size, text: L.text, page: pi, y: L.y };
+      });
+    }
+    var authorBlock = '';
+    if (best) {
+      var below = itemsToLines(pageItems[best.page]).filter(function (L) { return L.y > best.y && L.y < best.y + 120; });
+      var auth = [];
+      for (var i = 0; i < below.length && auth.length < 3; i++) {
+        if (/^(abstract|keywords|introduction)\b/i.test(below[i].text)) break;
+        if (below[i].text.length >= 2 && below[i].size < best.size) auth.push(below[i].text);
+      }
+      authorBlock = auth.join(', ');
+    }
+    return { title: best ? best.text : '', authorBlock: authorBlock };
+  }
+  function joinEntry(lines) {
+    var s = '';
+    for (var i = 0; i < lines.length; i++) {
+      if (i === 0) s = lines[i];
+      else if (s.charAt(s.length - 1) === '­') s = s.slice(0, -1) + lines[i];
+      else if (s.charAt(s.length - 1) === '-') s = s + lines[i];
+      else s = s + ' ' + lines[i];
+    }
+    return s.replace(/\s+/g, ' ').trim();
+  }
+  function referencesFromLines(lines) {
+    var start = null, inline = null;
+    for (var i = 0; i < lines.length; i++) {
+      var m = lines[i].match(PDF_HEADING);
+      if (m) { start = i + 1; var rest = lines[i].slice(m[0].length).trim(); inline = rest || null; }
+    }
+    if (start === null) return [];
+    var body = (inline ? [inline] : []).concat(lines.slice(start).filter(function (l) { return l && !PDF_JUNK.test(l); }));
+    var entries = [], cur = [];
+    for (var b = 0; b < body.length; b++) {
+      var l = body[b];
+      if (PDF_BIO.test(l) && !PDF_AUTHOR_START.test(l) && !/\b(19|20)\d{2}\b/.test(l)) break;
+      var isStart = PDF_AUTHOR_START.test(l) && (cur.length === 0 || PDF_ENDS.test(cur[cur.length - 1]));
+      if (isStart && cur.length) { entries.push(cur); cur = [l]; } else cur.push(l);
+    }
+    if (cur.length) entries.push(cur);
+    return entries.map(joinEntry);
+  }
+  function arrayBufferToBase64(buf) {
+    var bytes = new Uint8Array(buf), CH = 0x8000, bin = '';
+    for (var i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(bin);
+  }
+  function extractPdfClient(buf) {
+    if (!window.pdfjsLib) return Promise.reject(new Error('PDF reader (pdf.js) did not load — check your connection, or upload the .docx.'));
+    return pdfjsLib.getDocument({ data: buf }).promise.then(function (pdf) {
+      var pageItems = [], allLines = [], seq = Promise.resolve();
+      function doPage(pno) {
+        return pdf.getPage(pno).then(function (page) {
+          var vp = page.getViewport({ scale: 1 });
+          return page.getTextContent().then(function (tc) {
+            var items = tc.items.filter(function (it) { return it.str && it.str.trim(); }).map(function (it) {
+              var x0 = it.transform[4], yb = it.transform[5];          // pdf.js: origin bottom-left
+              return { str: it.str, x0: x0, x1: x0 + (it.width || 0), y: vp.height - yb, size: it.height || 0 };
+            });
+            pageItems.push(items);                                     // for title/authors (first pages)
+            var body = items.filter(function (w) { return w.y > 40 && w.y < vp.height - 40; });
+            allLines = allLines.concat(pageLines(body, vp.width));
+          });
+        });
+      }
+      for (var p = 1; p <= pdf.numPages; p++) { (function (pp) { seq = seq.then(function () { return doPage(pp); }); })(p); }
+      return seq.then(function () {
+        var ta = extractTitleAuthors(pageItems);
+        return {
+          title: ta.title, authorBlock: ta.authorBlock, keywords: '',
+          rawRefs: referencesFromLines(allLines),
+          diagnostics: { source: 'pdf', styledRefCount: 0, usedFallback: true,
+                         titleFound: !!ta.title, titleFallback: true, authorFound: !!ta.authorBlock }
+        };
+      });
+    });
+  }
+
   // ---- Stage A ----
   function pad(n) {
     var s = String(parseInt(n, 10) || '');
@@ -330,37 +493,45 @@
     var file = $('file').files[0];
     var email = $('email').value.trim();
     var num = $('number').value;
-    if (!num) return banner('bannerA', 'err', 'Please enter your paper number.');
+    if (!num) return banner('bannerA', 'err', 'Please enter your Paper ID.');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return banner('bannerA', 'err', 'Please enter a valid contact email.');
-    if (!file) return banner('bannerA', 'err', 'Please choose your .docx file.');
-    if (!/\.docx$/i.test(file.name)) return banner('bannerA', 'err', 'Please upload a Word .docx file (not PDF).');
+    if (!file) return banner('bannerA', 'err', 'Please choose your .docx or .pdf file.');
+    var isPdf = /\.pdf$/i.test(file.name), isDocx = /\.docx$/i.test(file.name);
+    if (!isPdf && !isDocx) return banner('bannerA', 'err', 'Please upload a Word .docx (recommended) or a PDF.');
 
     var btn = $('uploadBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Reading your paper…';
+    var meta = { vol: $('track').value, number: num, email: email };
+    function done() { btn.disabled = false; btn.textContent = 'Upload & parse references'; }
+    function ok(data) { done(); if (!data || !data.ok) return banner('bannerA', 'err', (data && data.error) || 'Upload failed.'); draft = data; renderStageB(data); }
+    function fail(msg) { done(); banner('bannerA', 'err', 'Upload failed: ' + msg); }
 
     var reader = new FileReader();
-    reader.onload = function () {
-      var res = reader.result;
-      var base64 = res.substring(res.indexOf(',') + 1);
-      serverCall('processUpload', {
-        base64: base64, filename: file.name,
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        meta: { vol: $('track').value, number: num, email: email }
-      }, function (data) {
-        btn.disabled = false; btn.textContent = 'Upload & parse references';
-        if (!data || !data.ok) return banner('bannerA', 'err', (data && data.error) || 'Upload failed.');
-        draft = data; renderStageB(data);
-      }, function (msg) {
-        btn.disabled = false; btn.textContent = 'Upload & parse references';
-        banner('bannerA', 'err', 'Upload failed: ' + msg);
-      });
-    };
-    reader.onerror = function () {
-      btn.disabled = false; btn.textContent = 'Upload & parse references';
-      banner('bannerA', 'err', 'Could not read the file.');
-    };
-    reader.readAsDataURL(file);
+    reader.onerror = function () { fail('could not read the file.'); };
+    if (isDocx) {
+      reader.onload = function () {
+        var res = reader.result, base64 = res.substring(res.indexOf(',') + 1);
+        serverCall('processUpload', {
+          base64: base64, filename: file.name,
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', meta: meta
+        }, ok, fail);
+      };
+      reader.readAsDataURL(file);
+    } else {                                          // PDF: extract in-browser, then send
+      reader.onload = function () {
+        var buf = reader.result, base64;
+        try { base64 = arrayBufferToBase64(buf); }     // BEFORE pdf.js detaches the buffer
+        catch (e) { return fail('could not read the PDF.'); }
+        extractPdfClient(buf).then(function (pre) {
+          serverCall('processUpload', {
+            preExtracted: pre, base64: base64,
+            filename: file.name, mimeType: 'application/pdf', meta: meta
+          }, ok, fail);
+        }).catch(function (e) { fail((e && e.message) || String(e)); });
+      };
+      reader.readAsArrayBuffer(file);
+    }
   }
 
   // ---- Stage B ----
@@ -368,7 +539,9 @@
     $('banners').innerHTML = '';
     $('bannerB').innerHTML = '';
     var d = data.diagnostics || {};
-    if (d.usedFallback || d.styledRefCount === 0) {
+    if (d.source === 'pdf') {
+      banner('banners', 'warn', 'You uploaded a PDF — extracting references from a PDF is approximate, so please check every row carefully. (A Word .docx gives the most accurate result.)');
+    } else if (d.usedFallback || d.styledRefCount === 0) {
       banner('banners', 'warn', 'We could not find references in the ACADIA-Reference style, so we detected them automatically — please check the list carefully.');
     }
     if (d.titleFallback) banner('banners', 'warn', 'We detected your title automatically (the ACADIA-Title style wasn’t applied) — please verify it.');

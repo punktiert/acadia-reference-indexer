@@ -42,20 +42,28 @@ function processUpload(payload) {
     var vol = String(meta.vol || '');
     if (!cfg.VOLUMES[vol]) return { ok: false, error: 'Please choose a valid volume/track.' };
     if (meta.number == null || isNaN(parseInt(meta.number, 10))) {
-      return { ok: false, error: 'Please enter your assigned paper number.' };
+      return { ok: false, error: 'Please enter your assigned Paper ID.' };
     }
-    if (!payload.base64) return { ok: false, error: 'No file was received — please choose your .docx.' };
+    if (!payload.base64) return { ok: false, error: 'No file was received.' };
 
     var id = buildPaperId(cfg, vol, meta.number);
     var type = (meta.type && String(meta.type).trim()) || typeForVolume(cfg, vol);
 
-    var bytes = Utilities.base64Decode(payload.base64);
-    var blob = Utilities.newBlob(bytes, payload.mimeType || 'application/octet-stream',
-                                 payload.filename || 'paper.docx');
+    var blob = Utilities.newBlob(Utilities.base64Decode(payload.base64),
+                 payload.mimeType || 'application/octet-stream', payload.filename || ('paper_' + id));
+    var fileId = savePaperFile_(blob, id, payload.filename);   // store the upload (.docx or .pdf)
 
-    var fileId = saveDocx_(blob, id, payload.filename);   // capture upload before parsing
-
-    var ex = extractDocx(blob);
+    // A PDF arrives pre-extracted from the browser (pdf.js); a .docx is unzipped + style-mapped here.
+    var ex;
+    if (payload.preExtracted) {
+      ex = payload.preExtracted;
+      ex.rawRefs = ex.rawRefs || [];
+      ex.authorBlock = ex.authorBlock || '';
+      ex.diagnostics = ex.diagnostics || { source: 'pdf' };
+    } else {
+      ex = extractDocx(blob);
+      ex.diagnostics.source = 'docx';
+    }
     var allAuthors = splitAuthorBlock(ex.authorBlock);
     var refs = ex.rawRefs.map(function (raw) {
       var r = parseReference(raw);
@@ -69,8 +77,8 @@ function processUpload(payload) {
         id: id, vol: vol, number: String(meta.number), type: type,
         email: String(meta.email || '').trim(), source: sourceForVolume(cfg, vol), driveFileId: fileId
       },
-      title: ex.title,
-      keywords: ex.keywords,
+      title: ex.title || '',
+      keywords: ex.keywords || '',
       authors: allAuthors.slice(0, cfg.MAX_AUTHORS),
       authorOverflow: Math.max(0, allAuthors.length - cfg.MAX_AUTHORS),
       references: refs,

@@ -53,10 +53,12 @@ of the whole Sheet — the tool travels with it — and run First-time setup aga
 
 ## For authors (one-screen instructions to circulate)
 
-1. In Word, make sure your references use the **ACADIA-Reference** paragraph style (and your
-   title/authors/keywords use the ACADIA template styles). That's what makes the import clean.
-2. Open the indexer link. Choose your **track**, type your **paper number** (from your
-   acceptance email), enter your **contact email**, and upload your **`.docx`**.
+1. Prefer the Word **`.docx`** (most accurate). In Word, make sure your references use the
+   **ACADIA-Reference** paragraph style (and the ACADIA template styles for title/authors).
+   A **`.pdf`** is also accepted — references are extracted in the browser (pdf.js), but
+   approximately, so you'll have more rows to review.
+2. Open the indexer link. Choose your **track**, type your **Paper ID** (EasyChair submission
+   number), enter your **contact email**, and upload your **`.docx`** (or `.pdf`).
 3. Review the parsed references. Orange-highlighted rows need a look (e.g. an unusual year).
    Fix anything wrong inline — especially author **First/Last** (middle names go in *First*).
 4. Click **Confirm & submit**. Done. (Re-submitting the same paper number safely replaces it.)
@@ -128,8 +130,13 @@ Prefer the CLI? You can also push the modular files with
 project, then `clasp push`) — but the paste-2-files flow above needs no tooling.
 
 ## Notes & limits
-- Apps Script can't accept a raw file over `google.script.run`, so the browser sends the
-  `.docx` as base64 (papers are a few MB — well within limits).
+- Apps Script can't accept a raw file over `google.script.run`, so the browser sends the file
+  as base64 (papers are a few MB — well within limits).
+- **PDF support:** Apps Script has no server-side PDF library, so a `.pdf` is parsed in the
+  browser with **pdf.js** (loaded from a CDN) — column detection + reference segmentation run
+  client-side, then the SAME server `parseReference()` handles the result. Laid-out PDFs are
+  multi-column, so extraction is approximate (the "PDF is approximate" banner + the review
+  gating are the safety net); the `.docx` path is unaffected and remains the most accurate.
 - If an author didn't apply the `ACADIA-Reference` style, the app falls back to scanning for a
   "References" heading and flags the result — but styled references are far more reliable.
 - The author confirmation step is the safety net: uncertain parses are flagged, never silently
